@@ -1,0 +1,16 @@
+waits for user to enter command
+when executing command, must must thread new process
+  when process done, must prompt user for next command
+
+must run interactively ^ and batch 
+  batch:
+    read file, execute lines in order, echo each line prior to executing
+
+no more commands after 'quit' or 'Ctrl-D'
+  once all running processes terminated, exit
+
+has to handle errors
+  print reasonable understandable error message
+
+invoked
+  shell [batchfile]
