@@ -1,5 +1,5 @@
 #include<stdio.h>
-const int MAXLINESIZE=1000;
+#include"main.h"
 
 main (int argc, char *argv[]) {
   if(argc == 1) {
@@ -7,23 +7,33 @@ main (int argc, char *argv[]) {
   } else {
     batchMode(argc,&argv[0]);
   }
-
 }
 
 int interactiveMode() { 
+  struct Cmd inputCmd;
   int quitFlag=0;
-  char line[MAXLINESIZE];
-  //char *line;
-  int n;
-  char quit[4]="quit";
+  char *quit="quit";
+  int i=0;
+  int index=0;
+  char nextWrd[MAXLINESIZE];
   while(!quitFlag) {
     printf("8[ ");
-    scanf("%s", line);
-    printf("your command: %s\n",line);
-    if(strcmp(line,quit)==0) {
-      printf("quit!!!\n");
-      quitFlag=1;
+    i=0;
+    index=0;
+    while((nextWrd[i]=getchar()) !='\n') {
+      if(nextWrd[i]==' ') {
+        inputCmd.argv[index]=nextWrd;
+        printf("%s",inputCmd.argv[index]); 
+        index++;
+      }
+        printf("%s",nextWrd); 
+      //if(strcmp(inputCmd.argv[index],quit)==0) {
+      //  printf("quit!!!\n");
+      //  quitFlag=1;
+      //}
+      i++;
     }
+    printf("\n");
   }
   return 1;
 }
