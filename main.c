@@ -1,27 +1,51 @@
-#include<stdio.h>
-#include"main.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
+#include "main.h"
 
-main (int argc, char *argv[]) {
+int main (int argc, char *argv[]) {
   if(argc == 1) {
     interactiveMode();
+  } else if(argc == 2) {
+    batchMode(argv[1]);
   } else {
-    batchMode(argc,&argv[0]);
+    fputs("Wrong number of command line arguments.\n", stderr);
+    exit(1);
   }
+
+  return 0;
 }
 
-int interactiveMode() { 
-  struct Cmd inputCmd;
-  int quitFlag=0;
-  char quit[4]="quit";
-  while(!quitFlag) {
+int interactiveMode() {
+  struct Cmd cmd;
+  char quit[] = "quit";
+
+  do {
     printf("8[ ");
-    quitFlag=parseCmd(&inputCmd);
-    break;
-  }
+    //parse command
+    parseCmd(&cmd);
+    printf("%s", cmd.argv[0]);
+
+    //fork child
+
+
+    //execute command
+    //wait for child to finish
+  } while (!feof(stdin) && strcmp(cmd.argv[0], quit));
+
+  // struct Cmd inputCmd;
+  // int quitFlag=0;
+  // char quit[4]="quit";
+  // while(!quitFlag) {
+  //   printf("8[ ");
+  //   quitFlag=parseCmd(&inputCmd);
+  //   break;
+  // }
   return 1;
 }
 
-int batchMode(int argc, char *argv[0]) {
+int batchMode(char *batchfile) {
   return 1;
 }
 
@@ -38,19 +62,25 @@ int readCmd(struct Cmd *inputCmd) {
  // }
   return 1;
 }
-int parseCmd(struct Cmd *inputCmd) {
-  int index=0;
-  char nextWrd[MAXLINESIZE];
-  int i=0;
-  while((nextWrd[i]=getchar()) !='\n') {
-    if(nextWrd[i]==' ') {
-      //inputCmd->argv[index]="doh";
-      mystrncpy(inputCmd->argv[index],nextWrd,i);
-      printf("%s\n",inputCmd->argv[index]);
+
+void parseCmd(struct Cmd *cmd) {
+  int word_index=0;
+  int char_index=0;
+  int prev_space=1;
+  char c;
+
+  while((c=getchar()) !='\n' && c != ';') {
+    if (isspace(c)) {
+      if (!prev_space) {
+        word_index++;
+        char_index=0;
+      }
+      prev_space=1;
+    } else {
+      cmd->argv[word_index][char_index] = c;
+      char_index++;
     }
-    i++;
   }
-  return 1;
 }
 
 int mystrncpy(char *dest,char *src,size_t n) {
@@ -58,4 +88,5 @@ int mystrncpy(char *dest,char *src,size_t n) {
   for(;i<n;i++) {
     *(dest+i)=src[i];
   }
+  return 1;
 }
