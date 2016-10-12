@@ -1,9 +1,8 @@
-#define MAXLINESIZE 1000
-#define MAXWORDS 300
+#define MAXLINESIZE 500
+#define MAXWORDS 100
 #define WORDSIZE 100
 
 struct Cmd {
-  char executable[WORDSIZE];
   char argv[MAXWORDS][WORDSIZE];
   int argc;
 };
