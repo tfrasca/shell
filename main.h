@@ -1,3 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+
 #define MAXLINESIZE 1000
 #define MAXWORDS 300
 #define WORDSIZE 100
@@ -7,8 +14,9 @@ struct Cmd {
   int argc;
 };
 
-int interactiveMode();
-int batchMode(char *batchfile);
-int readCmd(struct Cmd *inputCmd);
-void parseCmd(struct Cmd *inputCmd);
-int mystrncpy(char *dest,char *src,size_t n);
+//empty Cmd struct for resetting values
+static const struct Cmd ResetCmd;
+
+int shellLoop(FILE *batchfile, int batch);
+int parseCmd(struct Cmd *inputCmd, FILE *file_stream);
+int execCmd(struct Cmd *inputCmd);
