@@ -23,14 +23,19 @@ int interactiveMode() {
   int processPid;
   int *status;
   int quitFlag=0;
+  char *tmp[2];
+  //tmp[0] = "wc";
+  //tmp[1] = "file1.txt";
+  int err=0;
+  char *envp[1];
 
   do {
   //promt
     printf("8[ ");
     //parse command
     quitFlag = parseCmd(&cmd);
-    printf("%s\n",cmd.executable);
-    if(strncmp(cmd.executable,quit,4)==0 || quitFlag) {
+    printf("%s\n",cmd.argv[0]);
+    if(strncmp(cmd.argv[0],quit,4)==0 || quitFlag) {
       exit(0);
     }
 
@@ -38,18 +43,20 @@ int interactiveMode() {
     processPid = fork();
     if ( processPid ==0) {
       //not taking argv becuase supposed to be char *argv[] we have char argv[][]??
-      execve(cmd.executable,cmd.argv[0],NULL);
-      printf("child\n");
+      //err=execve(cmd.argv[0],cmd.argv,envp);
+      err=execve(cmd.argv[0],tmp,envp);
+      printf("child %d\n",err);
+      break;
     }
     else {
       printf("adult\n");
+      waitpid(processPid,status,0);
     }
-    waitpid(processPid,status,0);
 
 
     //execute command
     //wait for child to finish
-  } while (!feof(stdin) && strncmp(cmd.executable, quit,4)!=0);
+  } while (!feof(stdin) && strncmp(cmd.argv[0], quit,4)!=0);
 
   return 1;
 }
@@ -63,6 +70,7 @@ int readCmd(struct Cmd *inputCmd) {
 }
 
 int parseCmd(struct Cmd *cmd) {
+// need to wipe all values within cmd
   int word_index=0;
   int char_index=0;
   int prev_space=0;
@@ -79,12 +87,9 @@ int parseCmd(struct Cmd *cmd) {
       } 
       prev_space=1;
     } else {
-      if(word_index==0) {
-        cmd->executable[char_index]=c;
-      } else {
-        cmd->argv[word_index-1][char_index] = c;
-      }
+      cmd->argv[word_index][char_index] = c;
       char_index++;
+      prev_space=0;
     }
   }
   return 0;
