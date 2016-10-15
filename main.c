@@ -1,10 +1,8 @@
 #include "main.h"
 
 int main (int argc, char *argv[]) {
-    FILE *inputFile;
-
-    //specify whether in batch mode or interactive mode
-    int isBatch;
+    FILE *inputFile;    //stdin in interactive mode or batchFile in batch mode
+    int isBatch;        //specify whether in batch mode or interactive mode
 
     if(argc == 1) {
         isBatch = 0;
@@ -33,8 +31,9 @@ int shellLoop(FILE *inputFile, int isBatch) {
     struct Cmd cmd;
     int moreinput = 0;
     pid_t pid;
+    int num_pids = 0;
 
-    do {
+    while(1) {
         //clear previous values
         cmd = ResetCmd;
 
@@ -55,6 +54,12 @@ int shellLoop(FILE *inputFile, int isBatch) {
             printf("\n");
         }
 
+        //quit loop
+        //TODO: check it works 100%
+        if (feof(inputFile) || strcmp(cmd.argv[0], "quit") == 0) {
+            break;
+        }
+
         if (cmd.argc > 0) {
             //fork child
             pid = fork();
@@ -72,12 +77,17 @@ int shellLoop(FILE *inputFile, int isBatch) {
             //wait for child to finish if not in background execution mode
             else if (cmd.argv[cmd.argc-1][strlen(cmd.argv[cmd.argc-1])-1] != '&'){
                 waitpid(pid, NULL, 0);
-            }   
+            } else {
+                num_pids++;
+            }
         }
-    } while (!feof(inputFile) && strcmp(cmd.argv[0], "quit"));
+    }
 
-    printf("exiting\n");
     //TODO: wait until all children finish executing. store pids?
+    printf("exiting\n");
+    for (int i = 0; i < num_pids; i++) {
+        waitpid(-1, NULL, 0);
+    }
 
     return 0;
 }
@@ -87,6 +97,7 @@ int parseCmd(struct Cmd *cmd, FILE *input_filestream) {
     int prev_space=1;
     char c;
 
+    //TODO: may want to get whole line and parse the line
     while((c=fgetc(input_filestream)) != EOF && c != '\n' && c != ';') {
         if (isspace(c)) {
             if (!prev_space) {
@@ -132,13 +143,16 @@ int execCmd(struct Cmd *cmd) {
     if (strcmp(cmd->argv[0], "cd") == 0) {
 
     } else if (strcmp(cmd->argv[0], "clr") == 0) {
-
+        system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
 
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
 
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
-
+        for (int i = 1; i < cmd->argc; i++) {
+              fprintf(outputFile, "%s ", cmd->argv[i]);
+        }
+        fprintf(outputFile, "\n");
     } else if (strcmp(cmd->argv[0], "help") == 0) {
 
     } else if (strcmp(cmd->argv[0], "pause") == 0) {

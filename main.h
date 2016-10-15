@@ -11,6 +11,7 @@
 
 struct Cmd {
   char argv[MAXWORDS][WORDSIZE];
+  // char *argv[MAXWORDS];
   int argc;
 };
 
