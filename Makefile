@@ -6,7 +6,8 @@ lib= -lpthread
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 shell:  main.o
-	$(CC) -o shell main.o  $(lib)
+	$(CC) -o myshell main.o  $(lib)
+	echo 'alias shell=${PWD}/myshell'>>~/.bashrc
 
 clean:
 	rm -f *.o core* *~ shell
