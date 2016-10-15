@@ -18,8 +18,10 @@ struct Cmd {
 //empty Cmd struct for resetting values
 static const struct Cmd ResetCmd;
 
-int shellLoop(FILE *batchfile, int batch);
-// int parseCmd(struct Cmd *inputCmd, FILE *file_stream);
-int parseCmd(char *cmd_str, struct Cmd *cmd);
+int shellLoop(FILE *batchfile, int isBatch);
 int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch);
+int parseCmd(char *cmd_str, struct Cmd *cmd);
 int execCmd(struct Cmd *inputCmd);
+FILE *getOutputFile(struct Cmd *cmd);
+int getBackgroundExecution(struct Cmd *cmd);
+int cmdCases(struct Cmd *cmd, FILE *outputFile);
