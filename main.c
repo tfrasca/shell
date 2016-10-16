@@ -18,6 +18,7 @@ int main (int argc, char *argv[]) {
         fputs("Wrong number of command line arguments.\n", stderr);
         exit(1);
     }
+    createUserManual();
 
     shellLoop(inputFile, isBatch);
 
@@ -135,6 +136,7 @@ int parseCmd(char *cmd_str, struct Cmd *cmd) {
         if (isspace(c)) {
             if (!prev_space) {
                 tmp_cmd[char_index] = '\0';
+                //memory leak??
                 cmd->argv[cmd->argc] = malloc(strlen(tmp_cmd));
                 strcpy(cmd->argv[cmd->argc], tmp_cmd);
                 strcpy(tmp_cmd, reset_tmp);
@@ -240,6 +242,11 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     } else if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
+      if(cmd->argc == 1) {
+        system("ls");
+      } else {
+        system("ls");  
+      }
 
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
 
@@ -249,9 +256,11 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
         }
         fprintf(outputFile, "\n");
     } else if (strcmp(cmd->argv[0], "help") == 0) {
+      system("more userManual");
 
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
-
+        // entire operation even background?
+        //getchar();
     } else {
         //default: execute program
         //also handle invalid commands
@@ -260,4 +269,22 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     return 0;
 }
 
-
+int createUserManual() {
+    FILE *outputFile;
+    outputFile = fopen("userManual", "w");
+    int numCmds=8;
+    int i =0;
+    
+    for(;i<10;i++) {
+      fprintf(outputFile, "%s","Shell environment developed by Lisa Fan and Tyler Frasca\n");
+      fprintf(outputFile, "%s","cd <directory> --Change current directory to <directory>\n");
+      fprintf(outputFile, "%s","clr --Clear the Screen\n");
+      fprintf(outputFile, "%s","dir <directory> --List contents of <directory>\n");
+      fprintf(outputFile, "%s","echo --Display <comment> '>' overwrites file '>>' appends to file\n");
+      fprintf(outputFile, "%s","environ --Display environment strings\n");
+      fprintf(outputFile, "%s","help --View User Manual\n");
+      fprintf(outputFile, "%s","pause --Pauses operation until Enter\n");
+      fprintf(outputFile, "%s","quit --Exit shell\n");
+    }
+    fclose(outputFile);
+}

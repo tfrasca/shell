@@ -25,3 +25,4 @@ int execCmd(struct Cmd *inputCmd);
 FILE *getOutputFile(struct Cmd *cmd);
 int getBackgroundExecution(struct Cmd *cmd);
 int cmdCases(struct Cmd *cmd, FILE *outputFile);
+int createUserManual();
