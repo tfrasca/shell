@@ -159,6 +159,8 @@ int execCmd(struct Cmd *cmd) {
     int isBackground = 0;
     FILE *outputFile;
     int j;
+    int pipefd[2];
+    char *buf = "du";
 
     // Background Execution mode
     isBackground = getBackgroundExecution(cmd);
@@ -176,25 +178,38 @@ int execCmd(struct Cmd *cmd) {
     // }
     // printf("\n");
 
-    //fork child
-    pid = fork();
-
-    // Child process
-    if (pid == 0) {
-        //execute command
-        cmdCases(cmd, outputFile);
-
-        //terminate child process
-        exit(0);
+    if(pipe(pipefd)==-1) {
+      //stderr
+      printf("error");
     }
+    //fork child
+    if(cmdCases(cmd, outputFile)) {
+      
+      pid = fork();
+      printf("%d\n",pid);
+      // Child process
+      if (pid == 0) {
+          //execute command
+          //need to use interprocess communication to tell parent new directory 
+          close(pipefd[0]);
+          write(pipefd[1],"h",2);
 
-    // Parent process
-    //wait for child to finish if not in background execution mode
-    else if (!isBackground){
-        waitpid(pid, NULL, 0);
-    } else {
-        printf("not waiting\n");
-        // num_pids++;
+          //terminate child process
+          exit(0);
+      }
+
+      // Parent process
+      //wait for child to finish if not in background execution mode
+      else if (!isBackground){
+          waitpid(pid, NULL, 0);
+          close(pipefd[1]);
+          while(read(pipefd[0], &buf,sizeof(buf))>0) {
+            printf("pipe: %s\n",buf);
+          }
+      } else {
+          printf("not waiting\n");
+          // num_pids++;
+      }
     }
 
     return 0;
@@ -236,8 +251,17 @@ int getBackgroundExecution(struct Cmd *cmd) {
 
 int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     int i;
+    char *out;
 
     if (strcmp(cmd->argv[0], "cd") == 0) {
+      out =malloc(strlen(cmd->argv[0]) + strlen(cmd->argv[1]) + 2);
+      strcpy(out, cmd->argv[0]);
+      strcat(out," ");
+      strcat(out,cmd->argv[1]);
+      printf("%s\n",out);
+      system(out);
+      //chdir(cmd->argv[i]);
+      system("pwd");
 
     } else if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
@@ -245,10 +269,12 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
       if(cmd->argc == 1) {
         system("ls");
       } else {
+        char *tmp = "ls"; 
+        out=malloc(strlen(tmp)+ strlen(cmd->argv[1]) +2);
         system("ls");  
       }
-
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
+      system("printenv");
 
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
         for (i = 1; i < cmd->argc; i++) {
@@ -257,6 +283,8 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
         fprintf(outputFile, "\n");
     } else if (strcmp(cmd->argv[0], "help") == 0) {
       system("more userManual");
+    } else if (strcmp(cmd->argv[0], "shell") == 0) {
+     // create new shell within shell 
 
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
         // entire operation even background?
@@ -264,9 +292,10 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     } else {
         //default: execute program
         //also handle invalid commands
+        return 1;
     }
-
     return 0;
+
 }
 
 int createUserManual() {
