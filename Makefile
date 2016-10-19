@@ -6,7 +6,8 @@ lib= -lpthread
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 shell:  main.o
-	$(CC) -o shell main.o  $(lib)
+	$(CC) -o myshell main.o  $(lib)
+	export shell=${PWD}/myshell
 
 clean:
-	rm -f *.o core* *~ shell
+	rm -f *.o core* *~ shell myshell
