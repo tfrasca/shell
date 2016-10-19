@@ -1,10 +1,24 @@
 #include "main.h"
 
+extern char **environ;
+
 int main (int argc, char *argv[]) {
     FILE *inputFile;    //stdin in interactive mode or batchFile in batch mode
     int isBatch;        //specify whether in batch mode or interactive mode
+    //make func
+    int sizeBuf=100;
+    char buf[sizeBuf+1];
+    getcwd(buf,sizeBuf);
+    char *pwd=strtok(buf," ");
+    //printf("%s : %d\n", pwd,strlen(pwd));
+    char *shellDIR = malloc(strlen("export shell=") + strlen(pwd));
+    
 
+
+   // system("export shell=buf");
+    //printf("%s \n",buf);
     if(argc == 1) {
+        printf("Welcome to the Shell\n");
         isBatch = 0;
         inputFile = stdin;
     } else if(argc == 2) {
@@ -183,6 +197,7 @@ int execCmd(struct Cmd *cmd) {
       printf("error");
     }
     //fork child
+    printf("%s\n",cmd->argv[0]);
     if(cmdCases(cmd, outputFile)) {
       
       pid = fork();
@@ -254,27 +269,52 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     char *out;
 
     if (strcmp(cmd->argv[0], "cd") == 0) {
-      out =malloc(strlen(cmd->argv[0]) + strlen(cmd->argv[1]) + 2);
-      strcpy(out, cmd->argv[0]);
-      strcat(out," ");
-      strcat(out,cmd->argv[1]);
-      printf("%s\n",out);
-      system(out);
-      //chdir(cmd->argv[i]);
-      system("pwd");
+      if(cmd->argc > 1) {
+        out = malloc(strlen("cd") + strlen(cmd->argv[1])+2);  
+        strcpy(out,"cd ");
+        strcat(out,cmd->argv[1]);
+        // ask about reporting
+        printf("%s\n",out);
+        system(out);
+        //if(system(out)==-1) {
+        //  printf("wtf");
+        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
+        //}
+        //char *tmpOld = getenv("OLDPWD");
+        //setenv("OLDPWD",getenv("PWD"),1); 
+        //if(setenv("PWD", cmd->argv[1],1) ==-1) {
+        //  setenv("OLDPWD",tmpOld,1);
+        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
+        //}
 
+      } else {
+      // ask about reporting
+        fprintf(outputFile,"%s\n",getenv("PWD"));
+      }
+      printf("%s\n",getenv("PWD"));
     } else if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
       if(cmd->argc == 1) {
-        system("ls");
+        out=malloc(strlen(getenv("PWD"))+ 5);
+        //printf("%s\n",getenv("PWD"));
+        strcpy(out,"dir "); 
+        strcat(out,getenv("PWD"));
+        printf("%s\n",out);
+        system(out);
       } else {
-        char *tmp = "ls"; 
+        char *tmp = "dir "; 
         out=malloc(strlen(tmp)+ strlen(cmd->argv[1]) +2);
-        system("ls");  
+        strcpy(out,tmp);
+        strcat(out,cmd->argv[1]); 
+        printf("%s\n",out);
+        system(out);  
       }
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
-      system("printenv");
+      int i=0;
+      while(environ[i]) {
+        printf("%s\n", environ[i++]); 
+      }
 
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
         for (i = 1; i < cmd->argc; i++) {
@@ -283,12 +323,12 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
         fprintf(outputFile, "\n");
     } else if (strcmp(cmd->argv[0], "help") == 0) {
       system("more userManual");
-    } else if (strcmp(cmd->argv[0], "shell") == 0) {
+    //} else if (strcmp(cmd->argv[0], "shell") == 0) {
      // create new shell within shell 
-
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
         // entire operation even background?
-        //getchar();
+        printf("Press Enter to continue ---------------\n");
+        getchar();
     } else {
         //default: execute program
         //also handle invalid commands
