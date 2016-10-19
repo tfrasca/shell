@@ -270,6 +270,7 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
 
     if (strcmp(cmd->argv[0], "cd") == 0) {
       if(cmd->argc > 1) {
+        // should use chdir function instead of system(cd)
         out = malloc(strlen("cd") + strlen(cmd->argv[1])+2);  
         strcpy(out,"cd ");
         strcat(out,cmd->argv[1]);
