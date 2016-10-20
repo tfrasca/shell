@@ -173,8 +173,6 @@ int execCmd(struct Cmd *cmd) {
     int isBackground = 0;
     FILE *outputFile;
     int j;
-    int pipefd[2];
-    char *buf = "du";
 
     // Background Execution mode
     isBackground = getBackgroundExecution(cmd);
@@ -192,22 +190,40 @@ int execCmd(struct Cmd *cmd) {
     // }
     // printf("\n");
 
-    if(pipe(pipefd)==-1) {
-      //stderr
-      printf("error");
-    }
     //fork child
     printf("%s\n",cmd->argv[0]);
-    if(cmdCases(cmd, outputFile)) {
-      
+    if (strcmp(cmd->argv[0], "cd") == 0) {
+      if(cmd->argc > 1) {
+        //out = malloc(strlen("cd") + strlen(cmd->argv[1])+2);  
+        //strcpy(out,"cd ");
+        //strcat(out,cmd->argv[1]);
+        //// ask about reporting
+        //printf("%s\n",out);
+        //system(out);
+        printf("%s\n",cmd->argv[1]);
+        chdir(cmd->argv[1]);
+        //if(system(out)==-1) {
+        //  printf("wtf");
+        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
+        //}
+        //char *tmpOld = getenv("OLDPWD");
+        //setenv("OLDPWD",getenv("PWD"),1); 
+        //if(setenv("PWD", cmd->argv[1],1) ==-1) {
+        //  setenv("OLDPWD",tmpOld,1);
+        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
+        //}
+      } else {
+      // ask about reporting
+        fprintf(outputFile,"%s\n",getenv("PWD"));
+      }
+      printf("%s\n",getenv("PWD"));
+    } else {
       pid = fork();
-      printf("%d\n",pid);
       // Child process
       if (pid == 0) {
+        cmdCases(cmd, outputFile);
           //execute command
           //need to use interprocess communication to tell parent new directory 
-          close(pipefd[0]);
-          write(pipefd[1],"h",2);
 
           //terminate child process
           exit(0);
@@ -217,10 +233,6 @@ int execCmd(struct Cmd *cmd) {
       //wait for child to finish if not in background execution mode
       else if (!isBackground){
           waitpid(pid, NULL, 0);
-          close(pipefd[1]);
-          while(read(pipefd[0], &buf,sizeof(buf))>0) {
-            printf("pipe: %s\n",buf);
-          }
       } else {
           printf("not waiting\n");
           // num_pids++;
@@ -268,42 +280,19 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     int i;
     char *out;
 
-    if (strcmp(cmd->argv[0], "cd") == 0) {
-      if(cmd->argc > 1) {
-        out = malloc(strlen("cd") + strlen(cmd->argv[1])+2);  
-        strcpy(out,"cd ");
-        strcat(out,cmd->argv[1]);
-        // ask about reporting
-        printf("%s\n",out);
-        system(out);
-        //if(system(out)==-1) {
-        //  printf("wtf");
-        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
-        //}
-        //char *tmpOld = getenv("OLDPWD");
-        //setenv("OLDPWD",getenv("PWD"),1); 
-        //if(setenv("PWD", cmd->argv[1],1) ==-1) {
-        //  setenv("OLDPWD",tmpOld,1);
-        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
-        //}
 
-      } else {
-      // ask about reporting
-        fprintf(outputFile,"%s\n",getenv("PWD"));
-      }
-      printf("%s\n",getenv("PWD"));
-    } else if (strcmp(cmd->argv[0], "clr") == 0) {
+    if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
       if(cmd->argc == 1) {
         out=malloc(strlen(getenv("PWD"))+ 5);
         //printf("%s\n",getenv("PWD"));
-        strcpy(out,"dir "); 
+        strcpy(out,"ls "); 
         strcat(out,getenv("PWD"));
         printf("%s\n",out);
         system(out);
       } else {
-        char *tmp = "dir "; 
+        char *tmp = "ls "; 
         out=malloc(strlen(tmp)+ strlen(cmd->argv[1]) +2);
         strcpy(out,tmp);
         strcat(out,cmd->argv[1]); 
@@ -313,7 +302,7 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
       int i=0;
       while(environ[i]) {
-        printf("%s\n", environ[i++]); 
+        fprintf(outputFile,"%s\n", environ[i++]); 
       }
 
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
@@ -326,15 +315,18 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     //} else if (strcmp(cmd->argv[0], "shell") == 0) {
      // create new shell within shell 
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
-        // entire operation even background?
-        printf("Press Enter to continue ---------------\n");
-        getchar();
+      // entire operation even background?
+      printf("Press Enter to continue ---------------\n");
+      getchar();
     } else {
+      printf("executing %s\n",cmd->argv[0]);
+      if(execve(cmd->argv[0],cmd->argv,environ)==-1) {
+        fprintf(outputFile,"%s\n",strerror(errno)); 
+      }
         //default: execute program
         //also handle invalid commands
-        return 1;
     }
-    return 0;
+    return 1;
 
 }
 
