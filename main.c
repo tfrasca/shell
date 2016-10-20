@@ -53,6 +53,10 @@ int shellLoop(FILE *inputFile, int isBatch) {
         if (parseLine(cmd, inputFile, isBatch) == 1) {
             // exit();
             printf("exiting\n");
+                    printf("exiting\n");
+                    for (i = 0; i < num_pids; i++) {
+                        waitpid(-1, NULL, 0);
+                    }
             return 0;
         }
 
@@ -69,10 +73,13 @@ int shellLoop(FILE *inputFile, int isBatch) {
                     //TODO: wait until all children finish executing. store pids?
                     // exit();
                     printf("exiting\n");
+                    for (i = 0; i < num_pids; i++) {
+                        waitpid(-1, NULL, 0);
+                    }
                     return 0;
                 }
 
-                execCmd(&cmd[i]);
+                num_pids += execCmd(&cmd[i]);
             }
         }
     }
@@ -191,10 +198,11 @@ int execCmd(struct Cmd *cmd) {
         //wait for child to finish if not in background execution mode
         else if (!isBackground){
             waitpid(pid, NULL, 0);
-        } else {
-            printf("not waiting\n");
-            // num_pids++;
         }
+    }
+
+    if (isBackground) {
+        return 1;
     }
 
     return 0;
