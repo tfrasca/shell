@@ -11,6 +11,8 @@
 #define MAXWORDS 300
 #define WORDSIZE 100
 
+extern char **environ;
+
 struct Cmd {
   // char argv[MAXWORDS][WORDSIZE];
   char *argv[MAXWORDS];
@@ -28,3 +30,11 @@ FILE *getOutputFile(struct Cmd *cmd);
 int getBackgroundExecution(struct Cmd *cmd);
 int cmdCases(struct Cmd *cmd, FILE *outputFile);
 int createUserManual();
+
+void cdCmd(struct Cmd *cmd);
+void dirCmd(struct Cmd *cmd, FILE *outputFile, int cmd_size);
+void environCmd(FILE *outputFile);
+void echoCmd(struct Cmd *cmd, FILE *outputFile);
+void helpCmd(struct Cmd *cmd, int cmd_size);
+void pauseCmd();
+void extCmd(struct Cmd *cmd);

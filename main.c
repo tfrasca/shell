@@ -1,22 +1,9 @@
 #include "main.h"
 
-extern char **environ;
-
 int main (int argc, char *argv[]) {
     FILE *inputFile;    //stdin in interactive mode or batchFile in batch mode
     int isBatch;        //specify whether in batch mode or interactive mode
-    //make func
-    int sizeBuf=100;
-    char buf[sizeBuf+1];
-    getcwd(buf,sizeBuf);
-    char *pwd=strtok(buf," ");
-    //printf("%s : %d\n", pwd,strlen(pwd));
-    char *shellDIR = malloc(strlen("export shell=") + strlen(pwd));
     
-
-
-   // system("export shell=buf");
-    //printf("%s \n",buf);
     if(argc == 1) {
         printf("Welcome to the Shell\n");
         isBatch = 0;
@@ -32,6 +19,7 @@ int main (int argc, char *argv[]) {
         fputs("Wrong number of command line arguments.\n", stderr);
         exit(1);
     }
+
     createUserManual();
 
     shellLoop(inputFile, isBatch);
@@ -44,7 +32,7 @@ int main (int argc, char *argv[]) {
 }
 
 int shellLoop(FILE *inputFile, int isBatch) {
-    int num_cmds = 10;
+    int num_cmds = 10;      //TODO: change/make dynamic?
     struct Cmd cmd[num_cmds];
     pid_t pid;
     int num_pids = 0;
@@ -89,12 +77,6 @@ int shellLoop(FILE *inputFile, int isBatch) {
         }
     }
 
-
-    // printf("exiting\n");
-    // for (i = 0; i < num_pids; i++) {
-    //     waitpid(-1, NULL, 0);
-    // }
-
     return 0;
 }
 
@@ -107,6 +89,7 @@ int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch) {
     int i;
 
     line_len = getline(&line, &len, input_filestream);
+
     //getline returns -1 if EOF
     if (line_len == -1) {
         return 1;
@@ -190,53 +173,32 @@ int execCmd(struct Cmd *cmd) {
     // }
     // printf("\n");
 
-    //fork child
-    printf("%s\n",cmd->argv[0]);
+    //don't need to fork for cd
     if (strcmp(cmd->argv[0], "cd") == 0) {
-      if(cmd->argc > 1) {
-        //out = malloc(strlen("cd") + strlen(cmd->argv[1])+2);  
-        //strcpy(out,"cd ");
-        //strcat(out,cmd->argv[1]);
-        //// ask about reporting
-        //printf("%s\n",out);
-        //system(out);
-        printf("%s\n",cmd->argv[1]);
-        chdir(cmd->argv[1]);
-        //if(system(out)==-1) {
-        //  printf("wtf");
-        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
-        //}
-        //char *tmpOld = getenv("OLDPWD");
-        //setenv("OLDPWD",getenv("PWD"),1); 
-        //if(setenv("PWD", cmd->argv[1],1) ==-1) {
-        //  setenv("OLDPWD",tmpOld,1);
-        //  fprintf(outputFile,"can't cd into %s\n",cmd->argv[1]);
-        //}
-      } else {
-      // ask about reporting
-        fprintf(outputFile,"%s\n",getenv("PWD"));
-      }
-      printf("%s\n",getenv("PWD"));
+        cdCmd(cmd);
     } else {
-      pid = fork();
-      // Child process
-      if (pid == 0) {
-        cmdCases(cmd, outputFile);
-          //execute command
-          //need to use interprocess communication to tell parent new directory 
+        pid = fork();
 
-          //terminate child process
-          exit(0);
-      }
+        // Child process
+        if (pid == 0) {
+            //execute command
+            cmdCases(cmd, outputFile);
 
-      // Parent process
-      //wait for child to finish if not in background execution mode
-      else if (!isBackground){
-          waitpid(pid, NULL, 0);
-      } else {
-          printf("not waiting\n");
-          // num_pids++;
-      }
+            //terminate child process
+            if (outputFile != stdin) {
+                fclose(outputFile);
+            }
+            exit(0);
+        }
+
+        // Parent process
+        //wait for child to finish if not in background execution mode
+        else if (!isBackground){
+            waitpid(pid, NULL, 0);
+        } else {
+            printf("not waiting\n");
+            // num_pids++;
+        }
     }
 
     return 0;
@@ -249,15 +211,17 @@ FILE *getOutputFile(struct Cmd *cmd) {
     for (i = 0; i < cmd->argc; i++) {
         if (strcmp(cmd->argv[i], ">") == 0) {
             outputFile = fopen(cmd->argv[i+1], "w");
-            cmd->argv[i] = 0;
-            cmd->argc = i;
             break;
         } else if (strcmp(cmd->argv[i], ">>") == 0) {
             outputFile = fopen(cmd->argv[i+1], "a");
-            cmd->argv[i] = 0;
-            cmd->argc = i;
             break;
         }
+    }
+
+    //if redirect and redirect file are not last two words on command
+    //(excluding background execution)
+    if (i < cmd->argc-2 && strcmp(cmd->argv[cmd->argc-1], "&")) {
+        return NULL;
     }
 
     return outputFile;
@@ -279,73 +243,146 @@ int getBackgroundExecution(struct Cmd *cmd) {
 int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     int i;
     char *out;
+    int cmd_size = 0;
 
+    for (i = 0; i < cmd->argc; i++) {
+        cmd_size += strlen(cmd->argv[i]) + 1;
+    }
 
     if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
-      if(cmd->argc == 1) {
-        out=malloc(strlen(getenv("PWD"))+ 5);
-        //printf("%s\n",getenv("PWD"));
-        strcpy(out,"ls "); 
-        strcat(out,getenv("PWD"));
-        printf("%s\n",out);
-        system(out);
-      } else {
-        char *tmp = "ls "; 
-        out=malloc(strlen(tmp)+ strlen(cmd->argv[1]) +2);
-        strcpy(out,tmp);
-        strcat(out,cmd->argv[1]); 
-        printf("%s\n",out);
-        system(out);  
-      }
+        dirCmd(cmd, outputFile, cmd_size);
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
-      int i=0;
-      while(environ[i]) {
-        fprintf(outputFile,"%s\n", environ[i++]); 
-      }
-
+        environCmd(outputFile);
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
-        for (i = 1; i < cmd->argc; i++) {
-              fprintf(outputFile, "%s ", cmd->argv[i]);
-        }
-        fprintf(outputFile, "\n");
+        echoCmd(cmd, outputFile);
     } else if (strcmp(cmd->argv[0], "help") == 0) {
-      system("more userManual");
-    //} else if (strcmp(cmd->argv[0], "shell") == 0) {
-     // create new shell within shell 
+        helpCmd(cmd, cmd_size);
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
-      // entire operation even background?
-      printf("Press Enter to continue ---------------\n");
-      getchar();
+        pauseCmd();
     } else {
-      printf("executing %s\n",cmd->argv[0]);
-      if(execve(cmd->argv[0],cmd->argv,environ)==-1) {
-        fprintf(outputFile,"%s\n",strerror(errno)); 
-      }
-        //default: execute program
-        //also handle invalid commands
+        extCmd(cmd);
     }
-    return 1;
+    return 0;
+}
 
+void cdCmd(struct Cmd *cmd) {
+    char *oldpwd;
+    char cwd[1024];
+
+    if(cmd->argc > 1) {
+        oldpwd = getenv("OLDPWD");
+
+        //change cwd
+        if (chdir(cmd->argv[1]) == -1) {
+            fprintf(stderr, "%s\n",strerror(errno)); 
+        } else {
+            //change pwd and oldpwd
+            setenv("OLDPWD", getenv("PWD"), 1);
+
+            if(setenv("PWD", getcwd(cwd, sizeof(cwd)), 1) == -1) {
+                chdir(getenv("OLDPWD"));
+                setenv("OLDPWD",oldpwd,1);
+                fprintf(stderr,"can't cd into %s\n",cmd->argv[1]);
+            }
+        }
+    } else {
+        // ask about reporting
+        printf("%s\n",getenv("PWD"));
+    }
+}
+
+void dirCmd(struct Cmd *cmd, FILE *outputFile, int cmd_size) {
+    int i;
+    char *out;
+
+    out = malloc(cmd_size + strlen(getenv("PWD")) + 1);
+
+    strcpy(out, "ls ");
+
+    //if directory is not specified
+    if (cmd->argc == 1 || strcmp(cmd->argv[1], ">") == 0 || strcmp(cmd->argv[1], ">>") == 0) {
+        strcat(out, getenv("PWD"));
+    }
+
+    //specified directory and possible redirect
+    for (i = 1; i < cmd->argc; i++) {
+        strcat(out, " ");
+        strcat(out, cmd->argv[i]);
+    }
+
+    printf("%s\n", out);
+    if (system(out) == -1) {
+        fprintf(stderr, "%s\n",strerror(errno)); 
+    }
+}
+
+void environCmd(FILE *outputFile) {
+    int i = 0;
+    while(environ[i]) {
+        fprintf(outputFile,"%s\n", environ[i++]); 
+    }
+}
+
+void echoCmd(struct Cmd *cmd, FILE *outputFile) {
+    int i;
+
+    for (i = 1; i < cmd->argc; i++) {
+        //break if i/o redirect command
+        if (strcmp(cmd->argv[i], ">") == 0 || strcmp(cmd->argv[i], ">>") == 0) {
+            break;
+        }
+        fprintf(outputFile, "%s ", cmd->argv[i]);
+    }
+    fprintf(outputFile, "\n");
+}
+
+void helpCmd(struct Cmd *cmd, int cmd_size) {
+    int i;
+    char *out;
+
+    out = malloc(cmd_size + strlen("more userManual") + 1);
+
+    strcpy(out, "more userManual");
+    for (i = 1; i < cmd->argc; i++) {
+        strcat(out, " ");
+        strcat(out, cmd->argv[i]);
+    }
+
+    if (system(out) == -1) {
+        fprintf(stderr, "%s\n",strerror(errno)); 
+    }
+}
+
+void pauseCmd() {
+    // entire operation even background?
+    printf("Press Enter to continue ---------------\n");
+    getchar();
+}
+
+void extCmd(struct Cmd *cmd) {
+    printf("executing %s\n",cmd->argv[0]);
+    if(execve(cmd->argv[0],cmd->argv,environ)==-1) {
+        fprintf(stderr, "%s\n",strerror(errno)); 
+    }
 }
 
 int createUserManual() {
     FILE *outputFile;
     outputFile = fopen("userManual", "w");
-    int numCmds=8;
-    int i =0;
     
-    for(;i<10;i++) {
-      fprintf(outputFile, "%s","Shell environment developed by Lisa Fan and Tyler Frasca\n");
-      fprintf(outputFile, "%s","cd <directory> --Change current directory to <directory>\n");
-      fprintf(outputFile, "%s","clr --Clear the Screen\n");
-      fprintf(outputFile, "%s","dir <directory> --List contents of <directory>\n");
-      fprintf(outputFile, "%s","echo --Display <comment> '>' overwrites file '>>' appends to file\n");
-      fprintf(outputFile, "%s","environ --Display environment strings\n");
-      fprintf(outputFile, "%s","help --View User Manual\n");
-      fprintf(outputFile, "%s","pause --Pauses operation until Enter\n");
-      fprintf(outputFile, "%s","quit --Exit shell\n");
-    }
+    fprintf(outputFile, "Shell environment developed by Lisa Fan and Tyler Frasca\n");
+    fprintf(outputFile, "cd <directory> --Change current directory to <directory>\n");
+    fprintf(outputFile, "clr --Clear the Screen\n");
+    fprintf(outputFile, "dir <directory> --List contents of <directory>\n");
+    fprintf(outputFile, "echo --Display <comment> '>' overwrites file '>>' appends to file\n");
+    fprintf(outputFile, "environ --Display environment strings\n");
+    fprintf(outputFile, "help --View User Manual\n");
+    fprintf(outputFile, "pause --Pauses operation until Enter\n");
+    fprintf(outputFile, "quit --Exit shell\n");
+
     fclose(outputFile);
+
+    return 0;
 }
