@@ -4,7 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <errno.h>
 
+//change with values from xargs --show-limits
 #define MAXLINESIZE 1000
 #define MAXWORDS 300
 #define WORDSIZE 100
