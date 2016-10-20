@@ -154,18 +154,13 @@ int parseCmd(char *cmd_str, struct Cmd *cmd) {
 int execCmd(struct Cmd *cmd) {
     int pid;
     int isBackground = 0;
-    FILE *outputFile;
+    FILE *fp;
+    int fd;
     int j;
 
     // Background Execution mode
     isBackground = getBackgroundExecution(cmd);
 
-    // I/O Redirection
-    outputFile = getOutputFile(cmd);
-    if (outputFile == NULL) {
-        fputs("Invalid output file.\n", stderr);
-        return 1;
-    }
 
     // printf("argc: %d \n", cmd->argc);
     // for (j = 0; j < cmd->argc; j++) {
@@ -180,14 +175,15 @@ int execCmd(struct Cmd *cmd) {
         pid = fork();
 
         // Child process
-        if (pid == 0) {
-            //execute command
-            cmdCases(cmd, outputFile);
-
-            //terminate child process
-            if (outputFile != stdin) {
-                fclose(outputFile);
+        if (pid == 0) {    
+            // I/O Redirection
+            if (getOutputFile(cmd) == 1) {
+                fprintf(stderr, "Invalid redirect file\n");
             }
+
+            //execute command
+            cmdCases(cmd);
+
             exit(0);
         }
 
@@ -204,16 +200,17 @@ int execCmd(struct Cmd *cmd) {
     return 0;
 }
 
-FILE *getOutputFile(struct Cmd *cmd) {
-    FILE *outputFile = stdout;
+int getOutputFile(struct Cmd *cmd) {
+    FILE *fp = stdout;
+    int fd;
     int i;
 
     for (i = 0; i < cmd->argc; i++) {
         if (strcmp(cmd->argv[i], ">") == 0) {
-            outputFile = fopen(cmd->argv[i+1], "w");
+            fp = fopen(cmd->argv[i+1], "w");
             break;
         } else if (strcmp(cmd->argv[i], ">>") == 0) {
-            outputFile = fopen(cmd->argv[i+1], "a");
+            fp = fopen(cmd->argv[i+1], "a");
             break;
         }
     }
@@ -221,10 +218,23 @@ FILE *getOutputFile(struct Cmd *cmd) {
     //if redirect and redirect file are not last two words on command
     //(excluding background execution)
     if (i < cmd->argc-2 && strcmp(cmd->argv[cmd->argc-1], "&")) {
-        return NULL;
+        return 1;
     }
 
-    return outputFile;
+    if (fp == NULL) {
+        fputs("Invalid output file.\n", stderr);
+        return 1;
+    }
+
+    if (fileno(fp) != fileno(stdout)) {
+        if (dup2(fileno(fp), fileno(stdout)) < 0) {
+            fprintf(stderr, "%s\n",strerror(errno)); 
+        }
+        close(fd);
+        fclose(fp);        
+    }
+
+    return 0;
 }
 
 int getBackgroundExecution(struct Cmd *cmd) {
@@ -240,7 +250,7 @@ int getBackgroundExecution(struct Cmd *cmd) {
     return 0;
 }
 
-int cmdCases(struct Cmd *cmd, FILE *outputFile) {
+int cmdCases(struct Cmd *cmd) {
     int i;
     char *out;
     int cmd_size = 0;
@@ -252,11 +262,11 @@ int cmdCases(struct Cmd *cmd, FILE *outputFile) {
     if (strcmp(cmd->argv[0], "clr") == 0) {
         system("clear");
     } else if (strcmp(cmd->argv[0], "dir") == 0) {
-        dirCmd(cmd, outputFile, cmd_size);
+        dirCmd(cmd, cmd_size);
     } else if (strcmp(cmd->argv[0], "environ") == 0) {
-        environCmd(outputFile);
+        environCmd();
     } else if (strcmp(cmd->argv[0], "echo") == 0) {
-        echoCmd(cmd, outputFile);
+        echoCmd(cmd);
     } else if (strcmp(cmd->argv[0], "help") == 0) {
         helpCmd(cmd, cmd_size);
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
@@ -293,7 +303,7 @@ void cdCmd(struct Cmd *cmd) {
     }
 }
 
-void dirCmd(struct Cmd *cmd, FILE *outputFile, int cmd_size) {
+void dirCmd(struct Cmd *cmd, int cmd_size) {
     int i;
     char *out;
 
@@ -318,14 +328,14 @@ void dirCmd(struct Cmd *cmd, FILE *outputFile, int cmd_size) {
     }
 }
 
-void environCmd(FILE *outputFile) {
+void environCmd() {
     int i = 0;
     while(environ[i]) {
-        fprintf(outputFile,"%s\n", environ[i++]); 
+        printf("%s\n", environ[i++]); 
     }
 }
 
-void echoCmd(struct Cmd *cmd, FILE *outputFile) {
+void echoCmd(struct Cmd *cmd) {
     int i;
 
     for (i = 1; i < cmd->argc; i++) {
@@ -333,9 +343,9 @@ void echoCmd(struct Cmd *cmd, FILE *outputFile) {
         if (strcmp(cmd->argv[i], ">") == 0 || strcmp(cmd->argv[i], ">>") == 0) {
             break;
         }
-        fprintf(outputFile, "%s ", cmd->argv[i]);
+        printf("%s ", cmd->argv[i]);
     }
-    fprintf(outputFile, "\n");
+    printf("\n");
 }
 
 void helpCmd(struct Cmd *cmd, int cmd_size) {
@@ -362,6 +372,9 @@ void pauseCmd() {
 }
 
 void extCmd(struct Cmd *cmd) {
+    if (setenv("parent", getenv("shell"), 1) == -1) {
+        fprintf(stderr, "%s\n",strerror(errno)); 
+    }
     printf("executing %s\n",cmd->argv[0]);
     if(execve(cmd->argv[0],cmd->argv,environ)==-1) {
         fprintf(stderr, "%s\n",strerror(errno)); 
