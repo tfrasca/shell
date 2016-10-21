@@ -3,6 +3,7 @@
 int main (int argc, char *argv[]) {
     FILE *inputFile;    //stdin in interactive mode or batchFile in batch mode
     int isBatch;        //specify whether in batch mode or interactive mode
+    char *shellenv = malloc(strlen(getenv("PWD")) + strlen("/myshell"));
     
     //interactive mode
     if(argc == 1) {
@@ -26,6 +27,14 @@ int main (int argc, char *argv[]) {
 
     //write a user manual file for the help command
     createUserManual();
+
+    //set shell environment variable
+    strcpy(shellenv, getenv("PWD"));
+    strcat(shellenv, "/myshell");
+    if (setenv("shell", shellenv, 1) == -1) {
+        fprintf(stderr, "Unable to set shell environment variable.\n");
+        exit(1);
+    }
 
     shellLoop(inputFile, isBatch);
 
@@ -153,8 +162,8 @@ int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch) {
 
 int parseCmd(char *cmd_str, struct Cmd *cmd) {
     int cmd_len = strlen(cmd_str);
-    char tmp_cmd[WORDSIZE];
-    char reset_tmp[WORDSIZE];
+    char tmp_cmd[cmd_len];
+    char reset_tmp[cmd_len];
     int prev_space = 1;
     int char_index = 0;
     char c;

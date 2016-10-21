@@ -14,7 +14,7 @@
 #define MAXLINESIZE 1000
 #define MAXWORDS 300
 #define WORDSIZE 100
-#define MAXCMDS 10
+#define MAXCMDS 100
 
 extern char **environ;
 
