@@ -9,5 +9,8 @@ shell:  main.o
 	$(CC) -o myshell main.o  $(lib)
 	export shell=${PWD}/myshell
 
+mycat: mycat.o
+	$(CC) -o mycat mycat.o $(lib)
+
 clean:
 	rm -f *.o core* *~ shell myshell
