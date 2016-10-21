@@ -4,11 +4,15 @@ int main (int argc, char *argv[]) {
     FILE *inputFile;    //stdin in interactive mode or batchFile in batch mode
     int isBatch;        //specify whether in batch mode or interactive mode
     
+    //interactive mode
     if(argc == 1) {
         printf("Welcome to the Shell\n");
         isBatch = 0;
         inputFile = stdin;
-    } else if(argc == 2) {
+    } 
+
+    //batch mode
+    else if(argc == 2) {
         isBatch = 1;
         inputFile = fopen(argv[1], "r");
         if (inputFile == NULL) {
@@ -20,6 +24,7 @@ int main (int argc, char *argv[]) {
         exit(1);
     }
 
+    //write a user manual file for the help command
     createUserManual();
 
     shellLoop(inputFile, isBatch);
@@ -32,15 +37,18 @@ int main (int argc, char *argv[]) {
 }
 
 int shellLoop(FILE *inputFile, int isBatch) {
-    int num_cmds = 10;      //TODO: change/make dynamic?
-    struct Cmd cmd[num_cmds];
+    int num_cmds = 0;
+    struct Cmd cmd[MAXCMDS];
     pid_t pid;
     int num_pids = 0;
+    pthread_t threads[MAXCMDS];    // array of threads
+    int rtns[MAXCMDS];             // array of return values
+    int t_succs[MAXCMDS];          // array of thread creation return values
     int i,j;
 
     while(1) {
         //clear previous values
-        for (i=0; i < num_cmds; i++) {
+        for (i=0; i < MAXCMDS; i++) {
             cmd[i] = ResetCmd;
         }
 
@@ -50,18 +58,27 @@ int shellLoop(FILE *inputFile, int isBatch) {
         }
 
         //parse command, will return 1 if EOF in interactive mode
-        if (parseLine(cmd, inputFile, isBatch) == 1) {
-            // exit();
-            printf("exiting\n");
-                    printf("exiting\n");
-                    for (i = 0; i < num_pids; i++) {
-                        waitpid(-1, NULL, 0);
-                    }
+        num_cmds = parseLine(cmd, inputFile, isBatch);
+        if (num_cmds == -1) {
+            printf("exiting...\n");
+            for (i = 0; i < num_pids; i++) {
+                waitpid(-1, NULL, 0);
+            }
             return 0;
         }
 
-        for (i = 0; i < num_cmds; i++) {
-            if (cmd[i].argc > 0) {
+        if (num_cmds == 1) {
+            if (strcmp(cmd[0].argv[0], "quit") == 0) {
+                printf("exiting...\n");
+                for (i = 0; i < num_pids; i++) {
+                    waitpid(-1, NULL, 0);
+                }
+                return 0;
+            }
+
+            num_pids += (int)execCmd(&cmd[0]);
+        } else {
+            for (i = 0; i < num_cmds; i++) {
                 // printf("argc: %d \n", cmd[i].argc);
                 // for (j = 0; j < cmd[i].argc; j++) {
                 //     printf("argv: %s ", cmd[i].argv[j]);
@@ -70,16 +87,27 @@ int shellLoop(FILE *inputFile, int isBatch) {
 
                 //quit loop
                 if (strcmp(cmd[i].argv[0], "quit") == 0) {
-                    //TODO: wait until all children finish executing. store pids?
-                    // exit();
-                    printf("exiting\n");
+                    printf("exiting...\n");
                     for (i = 0; i < num_pids; i++) {
                         waitpid(-1, NULL, 0);
                     }
                     return 0;
                 }
 
-                num_pids += execCmd(&cmd[i]);
+                t_succs[i] = pthread_create(&threads[i], 
+                        NULL, 
+                        execCmd, 
+                        (void *)&cmd[i] );
+                
+            }
+
+            for (int i = 0; i < num_cmds; i++) {
+                if (t_succs[i] == 0) {
+                    pthread_join(threads[i], (void *)&rtns[i]);
+                    num_pids += rtns[i];
+                } else {
+                    fprintf(stderr, "Could not create thread %d!\n", i+1);
+                }
             }
         }
     }
@@ -99,7 +127,7 @@ int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch) {
 
     //getline returns -1 if EOF
     if (line_len == -1) {
-        return 1;
+        return -1;
     }
 
     // if batch mode, echo input
@@ -107,8 +135,8 @@ int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch) {
         printf("%s\n", line);
     }
 
+    //parse commands in a line separated by ';'
     cmd_str = strtok(line, ";");
-
     while (cmd_str != NULL) {
         for (i = 0; i < strlen(cmd_str); i++) {
             if (!isspace(cmd_str[i])) {
@@ -120,7 +148,7 @@ int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch) {
         cmd_str = strtok(NULL, ";");
     }
 
-    return 0;
+    return cmd_num;
 }
 
 int parseCmd(char *cmd_str, struct Cmd *cmd) {
@@ -149,8 +177,7 @@ int parseCmd(char *cmd_str, struct Cmd *cmd) {
           }
           prev_space=1;
         } else {
-            tmp_cmd[char_index] = c;
-            char_index++;
+            tmp_cmd[char_index++] = c;
             prev_space=0;
         }
     }
@@ -158,7 +185,8 @@ int parseCmd(char *cmd_str, struct Cmd *cmd) {
     return 0;
 }
 
-int execCmd(struct Cmd *cmd) {
+void *execCmd(void *v_cmd) {
+    struct Cmd *cmd = (struct Cmd *)v_cmd;
     int pid;
     int isBackground = 0;
     FILE *fp;
@@ -186,6 +214,7 @@ int execCmd(struct Cmd *cmd) {
             // I/O Redirection
             if (getOutputFile(cmd) == 1) {
                 fprintf(stderr, "Invalid redirect file\n");
+                exit(1);
             }
 
             //execute command
@@ -202,10 +231,10 @@ int execCmd(struct Cmd *cmd) {
     }
 
     if (isBackground) {
-        return 1;
+        return (void *)1;
     }
 
-    return 0;
+    return (void *)0;
 }
 
 int getOutputFile(struct Cmd *cmd) {
@@ -263,6 +292,7 @@ int cmdCases(struct Cmd *cmd) {
     char *out;
     int cmd_size = 0;
 
+    //length of entire command
     for (i = 0; i < cmd->argc; i++) {
         cmd_size += strlen(cmd->argv[i]) + 1;
     }
@@ -280,6 +310,9 @@ int cmdCases(struct Cmd *cmd) {
     } else if (strcmp(cmd->argv[0], "pause") == 0) {
         pauseCmd();
     } else {
+        //default case:
+        // runs external programs,
+        //or deals with invalid commands
         extCmd(cmd);
     }
     return 0;
@@ -330,22 +363,30 @@ void dirCmd(struct Cmd *cmd, int cmd_size) {
         strcat(out, cmd->argv[i]);
     }
 
+    sem_wait(&io_sem);
     printf("%s\n", out);
     if (system(out) == -1) {
         fprintf(stderr, "%s\n",strerror(errno)); 
     }
+    sem_post(&io_sem);
+
+    free(out);
 }
 
 void environCmd() {
     int i = 0;
+
+    sem_wait(&io_sem);
     while(environ[i]) {
         printf("%s\n", environ[i++]); 
     }
+    sem_post(&io_sem);
 }
 
 void echoCmd(struct Cmd *cmd) {
     int i;
 
+    sem_wait(&io_sem);
     for (i = 1; i < cmd->argc; i++) {
         //break if i/o redirect command
         if (strcmp(cmd->argv[i], ">") == 0 || strcmp(cmd->argv[i], ">>") == 0) {
@@ -354,6 +395,7 @@ void echoCmd(struct Cmd *cmd) {
         printf("%s ", cmd->argv[i]);
     }
     printf("\n");
+    sem_post(&io_sem);
 }
 
 void helpCmd(struct Cmd *cmd, int cmd_size) {
@@ -368,14 +410,20 @@ void helpCmd(struct Cmd *cmd, int cmd_size) {
         strcat(out, cmd->argv[i]);
     }
 
+    sem_wait(&io_sem);
     if (system(out) == -1) {
         fprintf(stderr, "%s\n",strerror(errno)); 
     }
+    sem_post(&io_sem);
+
+    free(out);
 }
 
 void pauseCmd() {
     // entire operation even background?
+    sem_wait(&io_sem);
     printf("Press Enter to continue ---------------\n");
+    sem_post(&io_sem);
     getchar();
 }
 
