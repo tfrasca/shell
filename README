@@ -1,11 +1,134 @@
 Lisa Fan & Tyler Frasca
 lfan01   & tfrasc01
 
+Design Overview:
+	Our main structure is the Cmd struct, which represents a single command from the user. It stores the number
+	of arguments in the command, as well as the arguments themselves in a char * array. We utilize an array of
+	these Cmd structs to represent a single line of input, which may have multiple commands.
 
-Design overview: A few paragraphs describing the overall structure of your code and any important structures.
+	Our shell program works in the following way:
+		1. The shell is set up to run
+			-the program is either put in interactive mode or batch mode
+			-a user manual file is written for the help command to filter
+			-the shell variable is set in the shell environment
+		2. The shell then begins executing its main loop, which works as follows:
+			1. The commands from the previous iteration of the loop is cleared
+			2. A line of input is parsed, and commands from a line are stored in an array
+			3. A new thread is created for each command
+			4. The loop repeats from #1 when all threads complete executing
+	A command execution thread works as follows:
+		1. We fork a child process, which will execute the command and exit
+		2. If we are running in background execution mode, the parent process returns right away
+		3. Otherwise, the parent process waits for the child to complete execution, then returns
+	If a quit or EOF command is executed, the shell waits for all possible threads running in background execution mode
+	to complete, then quits.
 
-Complete specification: Describe how you handled any ambiguities in the specification. For example, for this project, explain how your shell will handle lines that have no commands between semi-colons.
 
-If you attempted the extra-credit and how successful you were in finishing it.
+Complete Specification:
+	We will walk through the complete specifications function-by-function.
+	main:
+		-the input file stream is either set to stdin or the file on the command line here
+		-if the file specified on the command line is invalid, the shell prints an error and exits
+		-if there is an incorrect number of arguments on the command line, the shell prints an error and exits
+		-if the shell is unable to set the shell variable in the environment, it prints an error and exits
+		-if the shell is running in batch mode, the batch file is closed after the shell loop, prior to the shell exiting
 
-Known bugs or problems: A list of any features that you did not implement or that you know are not working correctly
+	shellLoop:
+		-if a thread was unable to be created, the shell prints an error and continues 
+		-there can be at most 100 commands in a single line, as specified by our global constant MAXCMDS
+		-the shell can be terminated by either the command "quit" or an EOF character in both interactive and batch mode
+
+	parseLine/parseCmd:
+		-if more than MAXCMDS commands are issued in one line, an error is printed and only the first MAXCMDS commands are processed
+		-the maximum length of a line, command, or argument should be handled by getline() and strtok()
+		-we only parse commands and command arguments with at least one non-space character
+		-all whitespace characters are eliminated, as arguments are stored in array indices
+
+	getOutputFile:
+		-if a redirect file is specified, dup2 is used to redirect all following output for that command
+		-if the file specified cannot be opened, more than one file is specified, or dup2 is unsuccessful, the shell prints an error and continues
+		-the redirect characters (> or >>) must be delimited by spaces on both sides
+		-if successful, the redirect character and output file name are removed from the command for future processing
+
+	getBackgroundExecution:
+		-if the background execution character is the last argument, or is the last character of the last argument, a boolean flag is returned
+		-the background execution character is removed from the command for future processing
+
+	execCmd/cmdCases:
+		-if the command is "cd", it is executed without forking, as the environment of the parent process must be changed
+		-if we are in background execution mode, we return a boolean flag to increment the number of child processes to wait for before exiting
+
+	clr:
+		-clearing the screen is implemented using a call to system("clear")
+
+	cdCmd:
+		-changes the cwd using the chdir() system call
+		-changes the PWD and OLDPWD using getenv/setenv
+		-if either or the above two fails, an error is printed and the cwd, pwd, and oldpwd remain unchanged
+		-if no directory is specified, the pwd is printed
+		-if more than 1 argument specified, the shell prints an error and continues
+		-I/O redirect is unavailable for this command
+
+	dirCmd:
+		-the directory contents are printed using system("ls")
+		-if the directory is not specified, the current directory contents are printed
+		-if the system call fails, the system call error is printed and the shell continues
+		-if more than 1 argument is specified, the shell prints an error and continues
+		-I/O redirect is available for this command
+
+	environCmd:
+		-the environment variables are printed by iterating through the C variable "environ"
+		-each environment variable is printed on its own line
+		-if more than 1 argument is specified, the shell prints an error and continues
+		-I/O redirect is available for this command
+	
+	echoCmd:
+		-the command arguments are iterated through and printed
+		-one space is printed between each argument, and a newline is printed at the end
+		-if no argument is specified, a newline is printed
+		-I/O redirect is available for this command
+	
+	helpCmd:
+		-the user manual is displayed using system("more")
+		-the file opened by the more filter is the one created and written by getUserManual()
+		-if more than 1 argument is specified, the shell prints an error and continues
+		-I/O redirect is available for this command
+	
+	pauseCmd:
+		-the function waits using the getchar() function, which will wait until the user presses the enter key
+		-if more than 1 argument specified, the shell prints an error and continues
+		-if there is I/O redirect specified, the prompt for resuming operation is redirected to the file, but still waits
+		for user input before proceeding		
+	
+	extCmd:
+		-execve() is used to execute the external program
+		-if the parent environment variable is unable to be set, the shell prints an error and continues
+		-if execve() fails, the shell prints the error set by execve, and continues
+			-this will handle programs that don't exist, as well as program calls of invalid format
+
+Extra Credit:
+	To implement concurrency, we ran each command as a thread, and our execCmd() function the start routine for a thread.
+	We create a thread for each command in a single line, and wait until all the threads return until parsing the next line.
+	Since the forking happens inside the execCmd() function, this allows the background execution mode to continue working
+	with concurrency.
+	We believe the only resource that was necessary to protect was the output filestream. This especially becomes an issue if the same I/O redirect file is specified for multiple processes, as processes may overwrite or interfere with the output file. To prevent strange interleaving of output, we used a semaphore to lock any print statements. This way, commands like echo and help are ensured to print all of their output together without interruption.
+	However, any output from an external program is not locked. This is because we chose not to label the execve() call as a critical section. If we had done so, all processes that produce output must wait until the external program finishes executing, and the external program may not even need the output file stream. We believed that this would defeat the main purpose of making the commands concurrent. However, this also means that if two programs that share some external resources are run concurrently, those shared resources are not protected. Our current design choice reflects our wish to demonstrate concurrency at work (see quittest.c), but in practice it may be beneficial to protect the execve() call as a critical section.
+	Concurrently running processes also means commands are not guaranteed to run in the order that they are written on the line. Therefore, a line such as "cd ..; dir" is not guaranteed to change the directory before listing directory contents.
+
+Additional Test Programs:
+	We wrote two additional C programs to test our shell. Our makefile contains instructions for compiling them.
+	./quittest:
+		This program was written to demonstrate proper behavior with concurrency, background execution, and quit. When called, the program prints out the numbers 0-9, with a 1 second wait between each character. Because the program is guaranteed to take at least 10 seconds to run, and continuously prints output, we can see how it is interleaved with other output when run concurrently with other commands. We also used this program to test that new commands can be executed while this program runs in the background. Quitting right after executing this command in background execution mode also demonstrates that our shell waits until previous processes terminate before quitting.
+
+	./mycat <filename>:
+		This program prints the contents of the file specified by the command line. We used this program so that we could test I/O redirection without exiting our shell every time.
+
+Known bugs or problems:
+	-Despite asking several peers and instructors, we were ultimately unable to understand the following line from the instructions:
+		The shell environment should contain shell=<pathname>/myshell where <pathname>/myshell is the full path for the shell executable (not a hardwired path back to your directory, but the one from which it was executed).
+	We believe this meant we were supposed to export the shell variable to our environment prior to the execution of our shell program, so that we could invoke our program without the "./" prefix. We were unable to do this on the lab machines, since we do not have permission to change the environment variables.
+	We ultimately ended up setting the shell variable at the beginning of our shell program, so that an external program invocation without an explicit path is run by following the PWD variable in our environment.
+
+	-Our program currently has memory leaks. If we had more time, we would have gone through and freed the memory allocated
+	for commands and their arguments
+	-Given more time, we would also have liked to make our command array dynamic

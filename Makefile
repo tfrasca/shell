@@ -7,10 +7,12 @@ lib= -lpthread
 
 shell:  main.o
 	$(CC) -o myshell main.o  $(lib)
-	export shell=${PWD}/myshell
+
+quittest: quittest.o
+	$(CC) -o quittest quittest.o $(lib)
 
 mycat: mycat.o
 	$(CC) -o mycat mycat.o $(lib)
 
 clean:
-	rm -f *.o core* *~ shell myshell
+	rm -f *.o core* *~ shell myshell quittest mycat userManual

@@ -24,24 +24,30 @@ struct Cmd {
   int argc;
 };
 
+//sempahore for I/O
 sem_t io_sem;
 
 //empty Cmd struct for resetting values
 static const struct Cmd ResetCmd;
 
+//creates user manual file for the help command
+int createUserManual();
 int shellLoop(FILE *batchfile, int isBatch);
+
 int parseLine(struct Cmd cmd[], FILE *input_filestream, int isBatch);
 int parseCmd(char *cmd_str, struct Cmd *cmd);
-void *execCmd(void *inputCmd);		//concurrency function, (int, struct Cmd *)
+
 int getOutputFile(struct Cmd *cmd);
 int getBackgroundExecution(struct Cmd *cmd);
-int cmdCases(struct Cmd *cmd);
-int createUserManual();
 
+//concurrency function (return: int, arg: struct Cmd *)
+void *execCmd(void *inputCmd);		
+int cmdCases(struct Cmd *cmd);
 void cdCmd(struct Cmd *cmd);
 void dirCmd(struct Cmd *cmd, int cmd_size);
-void environCmd();
+void environCmd(struct Cmd *cmd);
 void echoCmd(struct Cmd *cmd);
 void helpCmd(struct Cmd *cmd, int cmd_size);
-void pauseCmd();
+void pauseCmd(struct Cmd *cmd);
 void extCmd(struct Cmd *cmd);
+
