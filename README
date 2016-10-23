@@ -12,10 +12,10 @@ Design Overview:
 			-a user manual file is written for the help command to filter
 			-the shell variable is set in the shell environment
 		2. The shell then begins executing its main loop, which works as follows:
-			1. The commands from the previous iteration of the loop is cleared
-			2. A line of input is parsed, and commands from a line are stored in an array
-			3. A new thread is created for each command
-			4. The loop repeats from #1 when all threads complete executing
+			1. A line of input is parsed, and commands from a line are stored in an array
+			2. A new thread is created for each command
+			3. The loop repeats from #1 when all threads complete executing
+
 	A command execution thread works as follows:
 		1. We fork a child process, which will execute the command and exit
 		2. If we are running in background execution mode, the parent process returns right away
@@ -41,7 +41,7 @@ Complete Specification:
 	parseLine/parseCmd:
 		-if more than MAXCMDS commands are issued in one line, an error is printed and only the first MAXCMDS commands are processed
 		-the maximum length of a line, command, or argument should be handled by getline() and strtok()
-		-we only parse commands and command arguments with at least one non-space character
+		-we only add commands and command arguments with at least one non-space character to our array of structs
 		-all whitespace characters are eliminated, as arguments are stored in array indices
 
 	getOutputFile:
@@ -56,11 +56,9 @@ Complete Specification:
 
 	execCmd/cmdCases:
 		-if the command is "cd", it is executed without forking, as the environment of the parent process must be changed
-		-if we are in background execution mode, we return a boolean flag to increment the number of child processes to wait for before exiting
-
-	clr:
 		-clearing the screen is implemented using a call to system("clear")
-
+		-if we are in background execution mode, we return a boolean flag to increment the number of child processes to wait for before exiting
+		
 	cdCmd:
 		-changes the cwd using the chdir() system call
 		-changes the PWD and OLDPWD using getenv/setenv
@@ -108,9 +106,8 @@ Complete Specification:
 
 Extra Credit:
 	To implement concurrency, we ran each command as a thread, and our execCmd() function the start routine for a thread.
-	We create a thread for each command in a single line, and wait until all the threads return until parsing the next line.
-	Since the forking happens inside the execCmd() function, this allows the background execution mode to continue working
-	with concurrency.
+	We create a thread for each command in a single line, and wait until all the threads return before parsing the next line.
+	Since the forking happens inside the execCmd() function, this allows the background execution mode to continue working with concurrency.
 	We believe the only resource that was necessary to protect was the output filestream. This especially becomes an issue if the same I/O redirect file is specified for multiple processes, as processes may overwrite or interfere with the output file. To prevent strange interleaving of output, we used a semaphore to lock any print statements. This way, commands like echo and help are ensured to print all of their output together without interruption.
 	However, any output from an external program is not locked. This is because we chose not to label the execve() call as a critical section. If we had done so, all processes that produce output must wait until the external program finishes executing, and the external program may not even need the output file stream. We believed that this would defeat the main purpose of making the commands concurrent. However, this also means that if two programs that share some external resources are run concurrently, those shared resources are not protected. Our current design choice reflects our wish to demonstrate concurrency at work (see quittest.c), but in practice it may be beneficial to protect the execve() call as a critical section.
 	Concurrently running processes also means commands are not guaranteed to run in the order that they are written on the line. Therefore, a line such as "cd ..; dir" is not guaranteed to change the directory before listing directory contents.
@@ -129,6 +126,6 @@ Known bugs or problems:
 	We believe this meant we were supposed to export the shell variable to our environment prior to the execution of our shell program, so that we could invoke our program without the "./" prefix. We were unable to do this on the lab machines, since we do not have permission to change the environment variables.
 	We ultimately ended up setting the shell variable at the beginning of our shell program, so that an external program invocation without an explicit path is run by following the PWD variable in our environment.
 
-	-Our program currently has memory leaks. If we had more time, we would have gone through and freed the memory allocated
+	-Our program currently has memoryle aks. If we had more time, we would have gone through and freed the memory allocated
 	for commands and their arguments
 	-Given more time, we would also have liked to make our command array dynamic
